@@ -6,8 +6,6 @@
 library(shiny)
 library(stringr)
 library(httr)
-library(jsonlite)
-library(rcdk)
 
 # Atomic mass dictionary for elements
 masses <- list(
@@ -42,171 +40,6 @@ masses <- list(
   "As" = "74.92160(2)", "Ar" = "39.948(1)", "Au" = "196.966569(4)", "At" = "[210]",
   "In" = "114.818(3)"
 )
-
-# Initialize an empty list to store element multiplicities
-multiples <- list()
-
-# Function to add commas between element symbols
-add_commas <- function(orig) {
-  with_commas <- str_replace_all(orig, "(?<=\\p{Lu})(?=\\p{Lu})", ",")
-  paste0(with_commas, ",")
-}
-
-# Function to find the number of occurrences of an element
-find_num <- function(i, val) {
-  if (str_detect(str_sub(val, i, i), "[A-Za-z,]")) {
-    return(str_sub(val, i, i))
-  }
-  count <- i
-  while (count < nchar(val) && !str_detect(str_sub(val, count, count), "[A-Za-z,]")) {
-    count <- count + 1
-  }
-  if (count >= nchar(val)) {
-    return(str_sub(val, i))
-  }
-  str_sub(val, i, count - 1)
-}
-
-# Function to distribute the number of occurrences of an element
-distribute <- function(val, num) {
-  build <- ""
-  sub <- 1
-  for (i in seq_len(nchar(val))) {
-    if (!str_detect(str_sub(val, i, i), "[A-Za-z]")) {
-      sub <- as.numeric(find_num(i, val))
-      sub <- sub * num
-      build <- paste0(build, sub)
-      i <- i + nchar(find_num(i, val)) - 1
-    } else if (i + 1 >= nchar(val) || str_detect(str_sub(val, i + 1, i + 1), "\\p{Lu}")) {
-      sub <- 1 * num
-      build <- paste0(build, str_sub(val, i, i), sub)
-      i <- i + nchar(find_num(i, val))
-      sub <- 1
-    } else {
-      build <- paste0(build, str_sub(val, i, i))
-    }
-  }
-  build
-}
-
-# Function to distribute the number of occurrences in parentheses
-distrib_parenth <- function(val) {
-  op <- str_locate(val, "\\(")[1]
-  num <- 1
-  while (!is.na(op)) {
-    close <- str_locate(val, "\\)", op)[1]
-    between <- str_sub(val, op + 1, close - 1)
-    if (close + 1 < nchar(val) && !str_detect(str_sub(val, close + 1, close + 1), "[A-Za-z]") && str_sub(val, close + 1, close + 1) != "") {
-      num <- as.numeric(str_sub(val, close + 1, close + 1))
-      val <- paste0(str_sub(val, 1, op - 1), distribute(between, num), str_sub(val, close + 2))
-    } else {
-      val <- paste0(str_sub(val, 1, op - 1), distribute(between, num), str_sub(val, close + 1))
-    }
-    op <- str_locate(val, "\\(", op + 1)[1]
-    num <- 1
-  }
-  val
-}
-
-# Function to add markers to the formula
-add_markers <- function(val) {
-  if (str_detect(val, "\\[") && str_detect(val, "\\]")) {
-    val <- str_replace_all(val, "\\[", "(")
-    val <- str_replace_all(val, "\\]", ")")
-    val <- distrib_parenth(val)
-  }
-  if (!str_detect(val, ",")) {
-    val <- add_commas(val)
-  }
-  val
-}
-
-# Function to add element multiplicities to the 'multiples' list
-add <- function(mult, symb) {
-  com <- str_locate(symb, ",")[1]
-  if (!is.na(com)) {
-    symb <- str_sub(symb, 1, com - 1)
-  }
-  if (!(symb %in% names(multiples))) {
-    multiples[[symb]] <<- mult
-  } else {
-    multiples[[symb]] <<- multiples[[symb]] + mult
-  }
-}
-
-# Function to strip coefficients from the formula
-strip_coeff <- function(val) {
-  build <- ""
-  symb <- ""
-  coeff <- FALSE
-  i <- 1
-  while (i <= nchar(val)) {
-    if (!str_detect(str_sub(val, i, i), "[A-Za-z]") && str_sub(val, i, i) != ",") {
-      num <- as.numeric(find_num(i, val))
-      add(num, symb)
-      coeff <- TRUE
-    }
-    if (str_sub(val, i, i) == ",") {
-      if (str_detect(str_sub(val, i, i), "[A-Za-z]") || str_sub(val, i, i) == ",") {
-        symb <- paste0(symb, str_sub(val, i, i))
-      }
-      if (!coeff) {
-        add(1, symb)
-      }
-      build <- paste0(build, symb)
-      symb <- ""
-      coeff <- FALSE
-    } else if (str_detect(str_sub(val, i, i), "[A-Za-z]")) {
-      symb <- paste0(symb, str_sub(val, i, i))
-    }
-    i <- i + nchar(find_num(i, val))
-  }
-  if (nchar(build) == 0) {
-    return("")
-  }
-  build
-}
-
-# Function to calculate the mass of a single element
-calc_single_element <- function(val) {
-  count <- 0
-  num <- as.numeric(str_replace(masses[[val]], " g/mol", ""))
-  if (val %in% names(multiples)) {
-    count <- count + num * multiples[[val]]
-  } else {
-    count <- count + num
-  }
-  count
-}
-
-# Function to calculate the total molecular weight
-calculate <- function(comp) {
-  build <- ""
-  count <- 0
-  finished <- c()
-  for (i in seq_len(nchar(comp))) {
-    if (str_sub(comp, i, i) == ",") {
-      if (build %in% names(masses) && !(build %in% finished)) {
-        count <- count + calc_single_element(build)
-        finished <- c(finished, build)
-      } else if (!(build %in% names(masses))) {
-        return(build)
-      }
-      build <- ""
-    } else if (i == nchar(comp)) {
-      build <- paste0(build, str_sub(comp, i, i))
-      if (build %in% names(masses) && !(build %in% finished)) {
-        count <- count + calc_single_element(build)
-        finished <- c(finished, build)
-      } else if (!(build %in% names(masses))) {
-        return(build)
-      }
-    } else {
-      build <- paste0(build, str_sub(comp, i, i))
-    }
-  }
-  count
-}
 
 # Function to tokenize the molecule formula
 tokenize_molecule <- function(formula) {
@@ -303,25 +136,39 @@ calculate_mass <- function(formula, masses) {
   invisible(list(total_mass = total_mass, uncertain_elements = uncertain_elements))
 }
 
-# Function to check Lipinski's Rule (without logP)
 check_lipinski_rule <- function(formula) {
-  n_atoms <- str_count(formula, "N")
-  o_atoms <- str_count(formula, "O")
-  nh_groups <- n_atoms
-  oh_groups <- o_atoms
-  molecular_weight <- calculate_mass(formula, masses)$total_mass
+  tokens <- tokenize_molecule(formula)
+  elements <- parse_formula(tokens)
+  
+  molecular_weight <- 0
+  n_atoms <- 0
+  o_atoms <- 0
+  
+  for (element in names(elements)) {
+    count <- elements[[element]]
+    if (element %in% names(masses)) {
+      mass <- as.numeric(str_replace(masses[[element]], "\\(.*\\)", ""))
+      molecular_weight <- molecular_weight + mass * count
+    }
+    if (element == "N") {
+      n_atoms <- count
+    }
+    if (element == "O") {
+      o_atoms <- count
+    }
+  }
+  
   mw_rule <- molecular_weight <= 500
-  no_rule <- (n_atoms + o_atoms) < 10
-  nhoh_rule <- (nh_groups + oh_groups) <= 5
-  passes_lipinski <- mw_rule && no_rule && nhoh_rule
+  no_rule <- (n_atoms + o_atoms) <= 10
+  
+  passes_lipinski <- mw_rule && no_rule
+  
   return(list(
     passes_lipinski = passes_lipinski,
     mw_rule = mw_rule,
-    no_rule = no_rule,
-    nhoh_rule = nhoh_rule
+    no_rule = no_rule
   ))
 }
-
 # Shiny UI
 ui <- fluidPage(
   titlePanel("Molecular Weight Calculator"),
@@ -334,7 +181,7 @@ ui <- fluidPage(
     
     mainPanel(
       verbatimTextOutput("result"),
-      h4("Lipinski's Rule (without logP):"),
+      h4("Lipinski's Rule (without logP and NH and OH groups rule):"),
       textOutput("lipinski_result"),
       textOutput("mw_result"),
       textOutput("no_result"),
@@ -360,34 +207,38 @@ server <- function(input, output, session) {
     lipinski_results <- check_lipinski_rule(formula)
     
     output$lipinski_result <- renderText({
-      if (lipinski_results$passes_lipinski) {
-        "The compound passes Lipinski's Rule (without logP)."
+      if (!is.null(lipinski_results$passes_lipinski)) {
+        if (lipinski_results$passes_lipinski) {
+          "The compound passes Lipinski's Rule (without logP and NH and OH groups rule)."
+        } else {
+          "The compound does not pass Lipinski's Rule (without logP and NH and OH groups rule)."
+        }
       } else {
-        "The compound does not pass Lipinski's Rule (without logP)."
+        "Unable to assess Lipinski's Rule."
       }
     })
     
     output$mw_result <- renderText({
-      if (lipinski_results$mw_rule) {
-        "Molecular Weight (<=500): PASS"
+      if (!is.null(lipinski_results$mw_rule)) {
+        if (lipinski_results$mw_rule) {
+          "Molecular Weight (<=500): PASS"
+        } else {
+          "Molecular Weight (<=500): FAIL"
+        }
       } else {
-        "Molecular Weight (<=500): FAIL"
+        "Unable to assess Molecular Weight rule."
       }
     })
     
     output$no_result <- renderText({
-      if (lipinski_results$no_rule) {
-        "Number of N and O atoms (<10): PASS"
+      if (!is.null(lipinski_results$no_rule)) {
+        if (lipinski_results$no_rule) {
+          "Number of N and O atoms (<=10): PASS"
+        } else {
+          "Number of N and O atoms (<=10): FAIL"
+        }
       } else {
-        "Number of N and O atoms (<10): FAIL"
-      }
-    })
-    
-    output$nhoh_result <- renderText({
-      if (lipinski_results$nhoh_rule) {
-        "Number of NH and OH groups (<=5): PASS"
-      } else {
-        "Number of NH and OH groups (<=5): FAIL"
+        "Unable to assess N and O atoms rule."
       }
     })
     
@@ -396,7 +247,7 @@ server <- function(input, output, session) {
   updateFormulaInput <- function(formula) {
     updateTextInput(session, "formula", value = formula)
   }
-
+  
   output$recent_formulas <- renderUI({
     formulas <- recent_formulas()
     if (length(formulas) > 0) {
@@ -415,6 +266,7 @@ server <- function(input, output, session) {
     updateFormulaInput(input$update_formula)
   })
 }
+
 
 # Run the Shiny app
 shinyApp(ui, server)
