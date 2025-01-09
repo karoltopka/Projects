@@ -1,0 +1,218 @@
+﻿@inject IDialogService DialogService 
+@inject ITaskService TaskService
+
+<div class="task-board">
+    <MudDropContainer T="TaskItem" Items="@Tasks" ItemsSelector="@((item,column) => item.Status == column)"
+                      ItemDropped="@((item) => OnDrop(item))">
+        <ChildContent>
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudDropZone T="TaskItem" Identifier="@Status.ToDo.ToString()" Class="task-column">
+                        <div class="column-header">
+                            <MudIcon Icon="@Icons.Material.Filled.List" Color="Color.Primary" Size="Size.Large" />
+                            <MudText Typo="Typo.h5" Color="Color.Primary">To Do</MudText>
+                        </div>
+                        <MudButton OnClick="OpenNewTaskDialog" StartIcon="@Icons.Material.Filled.Add"
+                                   Color="Color.Primary" Variant="Variant.Filled" Class="new-task-button">
+                            Add New Task
+                        </MudButton>
+                    </MudDropZone>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudDropZone T="TaskItem" Identifier="@Status.InProgress.ToString()" Class="task-column">
+                        <div class="column-header">
+                            <MudIcon Icon="@Icons.Material.Filled.Pending" Color="Color.Warning" Size="Size.Large" />
+                            <MudText Typo="Typo.h5" Color="Color.Warning">In Progress</MudText>
+                        </div>
+                    </MudDropZone>
+                </MudItem>
+            </MudGrid>
+        </ChildContent>
+        <ItemRenderer>
+            <MudPaper Class="task-card" Elevation="2">
+                <MudText Typo="Typo.h6" Class="task-title">@context.Title</MudText>
+                <MudText Typo="Typo.body2" Class="task-description">@context.Description</MudText>
+                <div class="task-actions">
+                    @if (context.Status == Status.InProgress.ToString())
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Done" Color="Color.Success"
+                                       Size="Size.Large" OnClick="@(() => Finish(context))" />
+                    }
+                    else
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Info"
+                                       OnClick="@(() => OpenUpdateTaskDialog(new TaskModel(context.Id, context.Title, context.Description, Status.ToDo)))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                       OnClick="@(() => Remove(context))" />
+                    }
+                </div>
+            </MudPaper>
+        </ItemRenderer>
+    </MudDropContainer>
+
+    <MudExpansionPanels Class="mt-6">
+        <MudExpansionPanel IsInitiallyExpanded="true">
+            <TitleContent>
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Class="mr-3"/>
+                    <MudText>Completed Tasks</MudText>
+                </div>
+            </TitleContent>
+            <ChildContent>
+                @foreach (var task in Tasks.Where(x => x.Status == Status.Done.ToString()))
+                {
+                    <MudPaper Class="completed-task-card" Elevation="1">
+                        <MudText Typo="Typo.h6" Class="completed-title">@task.Title</MudText>
+                        <MudText Typo="Typo.body2" class="completed-description">@task.Description</MudText>
+                    </MudPaper>
+                }
+            </ChildContent>
+        </MudExpansionPanel>
+    </MudExpansionPanels>
+</div>
+
+
+<style>
+    .task-board {
+        padding: 2rem;
+        background: linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%);
+        min-height: 100vh;
+    }
+    .task-column {
+        padding: 1.5rem;
+        background: white;
+        border-radius: 16px;
+        height: 100%;
+        min-height: 500px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    }
+    .column-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #eee;
+    }
+    .new-task-button {
+        width: 100%;
+        margin-bottom: 1rem;
+        border-radius: 8px;
+        text-transform: none;
+        padding: 0.75rem;
+    }
+    .task-card {
+        padding: 1rem;
+        margin: 0.75rem 0;
+        border-radius: 12px;
+        transition: all 0.2s ease-in-out;
+        border: 1px solid #eee;
+    }
+    .task-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    .task-title {
+        margin-bottom: 0.5rem;
+        color: #2d3748;
+    }
+    .task-description {
+        color: #718096;
+    }
+    .task-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid #eee;
+    }
+    .completed-task-card {
+        padding: 1rem;
+        margin: 0.5rem 0;
+        border-radius: 8px;
+        background: #f7fafc;
+        border: 1px solid #edf2f7;
+    }
+    .completed-title {
+        text-decoration: line-through;
+        color: #718096;
+    }
+    .completed-description {
+        color: #a0aec0;
+    }
+</style>
+
+@code {
+    private List<TaskItem> Tasks { get; set; } = new List<TaskItem>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task OnDrop(MudItemDropInfo<TaskItem> drop)
+    {
+        drop.Item.Status = drop.DropzoneIdentifier;
+        await TaskService.ChangeStatus(drop.Item.Id, Enum.Parse<Status>(drop.DropzoneIdentifier));
+    }
+
+    private async Task Finish(TaskItem task)
+    {
+        task.Status = Status.Done.ToString();
+        await TaskService.ChangeStatus(task.Id, Status.Done);
+        await LoadData();
+    }
+
+    private async Task Remove(TaskItem task)
+    {
+        await TaskService.Remove(task.Id);
+        await LoadData();
+    }
+
+    private async Task OpenNewTaskDialog()
+    {
+        var dialog = await DialogService.ShowAsync<NewTaskDialog>("");
+        var result = await dialog.Result;
+        if (result.Data is not null)
+        {
+            await TaskService.Create(result.Data as NewTask);
+            await LoadData();
+        }
+    }
+
+    private async Task OpenUpdateTaskDialog(TaskModel selectedTask)
+    {
+        var parameters = new DialogParameters<UpdateTaskDialog>
+        {
+            { x => x.TaskToUpdate, selectedTask }
+        };
+        var dialog = await DialogService.ShowAsync<UpdateTaskDialog>("", parameters);
+        var result = await dialog.Result;
+        if (result.Data is not null)
+        {
+            await TaskService.Update(result.Data as UpdateTask);
+            await LoadData();
+        }
+    }
+
+    private async Task LoadData()
+    {
+        Tasks = (await TaskService.GetAll()).Select(x => new TaskItem
+        {
+            Id = x.Id,
+            Title = x.Title,
+            Description = x.Description,
+            Status = x.Status.ToString()
+        }).ToList();
+        StateHasChanged();
+    }
+
+    public class TaskItem
+    {
+        public Guid Id { get; set; }
+        public string Title { get; set; }
+        public string? Description { get; set; }
+        public string Status { get; set; }
+    }
+}

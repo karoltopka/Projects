@@ -1,0 +1,46 @@
+@using System.ComponentModel.DataAnnotations;
+<EditForm @ref="form" Model="@model" OnValidSubmit="Submit">
+    <DataAnnotationsValidator />
+    <MudDialog>
+        <TitleContent>
+            <MudText Typo="Typo.h6">
+                Add task
+            </MudText>
+        </TitleContent>
+        <DialogContent>
+            <MudTextField Label="Title" @bind-Value="model.Title" For="@(() => model.Title)" />
+            <MudTextField Label="Description" @bind-Value="model.Description" For="@(() => model.Description)" Lines="3" />
+        </DialogContent>
+        <DialogActions>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" ButtonType="ButtonType.Submit" Class="px-10">Add</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Cancel" Class="px-10">Cancel</MudButton>
+        </DialogActions>
+    </MudDialog>
+</EditForm>
+@code {
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+
+    private EditForm form;
+    private NewTaskForm model = new NewTaskForm();
+
+    private void Submit(EditContext context)
+    {
+        if (context.Validate())
+        {
+            MudDialog.Close<NewTask>(new NewTask(model.Title, model.Description, model.CategoryId == Guid.Empty ? null : model.CategoryId));
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    class NewTaskForm
+    {
+        [Required]
+        public string Title { get; set; }
+        public string? Description { get; set; }
+        public Guid? CategoryId { get; set; }
+    }
+}

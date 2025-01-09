@@ -1,0 +1,11 @@
+/Users/Karez/RiderProjects/BlazorApp/BlazorApp1.Shared/obj/Debug/net8.0/BlazorApp1.Shared.GeneratedMSBuildEditorConfig.editorconfig
+/Users/Karez/RiderProjects/BlazorApp/BlazorApp1.Shared/obj/Debug/net8.0/BlazorApp1.Shared.AssemblyInfoInputs.cache
+/Users/Karez/RiderProjects/BlazorApp/BlazorApp1.Shared/obj/Debug/net8.0/BlazorApp1.Shared.AssemblyInfo.cs
+/Users/Karez/RiderProjects/BlazorApp/BlazorApp1.Shared/obj/Debug/net8.0/BlazorApp1.Shared.csproj.CoreCompileInputs.cache
+/Users/Karez/RiderProjects/BlazorApp/BlazorApp1.Shared/bin/Debug/net8.0/BlazorApp1.Shared.deps.json
+/Users/Karez/RiderProjects/BlazorApp/BlazorApp1.Shared/bin/Debug/net8.0/BlazorApp1.Shared.dll
+/Users/Karez/RiderProjects/BlazorApp/BlazorApp1.Shared/bin/Debug/net8.0/BlazorApp1.Shared.pdb
+/Users/Karez/RiderProjects/BlazorApp/BlazorApp1.Shared/obj/Debug/net8.0/BlazorApp1.Shared.dll
+/Users/Karez/RiderProjects/BlazorApp/BlazorApp1.Shared/obj/Debug/net8.0/refint/BlazorApp1.Shared.dll
+/Users/Karez/RiderProjects/BlazorApp/BlazorApp1.Shared/obj/Debug/net8.0/BlazorApp1.Shared.pdb
+/Users/Karez/RiderProjects/BlazorApp/BlazorApp1.Shared/obj/Debug/net8.0/ref/BlazorApp1.Shared.dll
